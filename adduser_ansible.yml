@@ -1,0 +1,21 @@
+---
+- hosts: all
+  vars:
+    publickey: "{{ lookup('env', 'HOME') }}/.ssh/id_rsa.pub"
+    greeting_message: "Hello, Ansible!!"
+  tasks:
+  - name: Test connection
+    ping: 
+  - name: Greeting
+    debug: msg={{ greeting_message }}
+  - name: Create user used by ansible
+    user: name=ansible
+  - name: Add SSH publickey of controller node
+    authorized_key:
+      user: ansible
+      key: "{{ lookup('file', '{{ publickey }}') }}"
+  - name: Grant sudo privileges
+    lineinfile:
+      dest: /etc/sudoers
+      backup: yes
+      line: "ansible ALL=(ALL) NOPASSWD: ALL"
