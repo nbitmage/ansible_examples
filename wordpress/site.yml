@@ -1,0 +1,6 @@
+---
+- name: Install Wordpress environment
+  hosts: all
+  remote_user: ansible
+
+  roles:
