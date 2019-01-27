@@ -1,6 +1,87 @@
 ---
-- name: Install Wordpress environment
-  hosts: all
+- hosts: wordpress
   remote_user: ansible
-
-  roles:
+  become: yes
+  vars:
+    wordpress_url: https://ja.wordpress.org/wordpress-5.0.3-ja.tar.gz
+    server_hostname: site.ansible00
+    mariadb_root_password: password
+    mariadb_wodpress_password: password
+  tasks:
+    - name: Test connection
+      ping:
+    - name: Remove Apache
+      apt:
+        name: apache2
+        state: absent
+    - name: Install nginx
+      apt:
+        name: nginx
+        update_cache: yes
+    - name: Copy nginx configuration for wordpress
+      template:
+        src: wordpress.conf
+        dest: /etc/nginx/conf.d/wordpress.conf
+    - name: Restart nginx
+      systemd: name=nginx state=restarted enabled=yes
+    - name: Install PHP
+      apt:
+        name: ["php-fpm", "php-mysql"]
+        state: latest
+    - name: Set timezone for PHP
+      ini_file:
+        dest: /etc/php/7.2/fpm/php.ini
+        section: Date
+        option: date.timezone
+        value: '"Asia/Tokyo"'
+    - name: Install MariaDB
+      apt:
+        name: ["mariadb-server", "libmysqlclient-dev"]
+        state: latest
+    - name: Install pip
+      apt:
+        name: "python-pip"
+        state: latest
+    - name: Install DB client for python
+      pip:
+        name: "MySQL-python"
+        state: latest
+    - name: Configure MariaDB
+      template:
+        src: mysql.cnf
+        dest: /etc/mysql/conf.d/mysql.cnf
+    - name: Start MariaDB service
+      systemd:
+        name: mariadb
+        state: restarted
+        enabled: yes
+    - name: Set the password for root user of MariaDB
+      mysql_user:
+        name: root
+        password: "{{ mariadb_root_password }}"
+        host: localhost
+    - name: Create database `wordpress`
+      mysql_db:
+        name: wordpress
+        state: present
+    - name: Create database user `wordpress`
+      mysql_user:
+        name: wordpress
+        password: "{{ mariadb_wodpress_password }}"
+        priv: "wordpress.*:all"
+        host: localhost
+    - name: Download WordPress
+      get_url:
+        url: "{{ wordpress_url }}"
+        dest: /tmp/wordpress.tar.gz
+    - name: Extract files from archive
+      unarchive:
+        src: /tmp/wordpress.tar.gz
+        dest: /srv
+        copy: no
+    - name: Change ownership of wordpress directory
+      file:
+        path: /srv/wordpress/
+        owner: www-data
+        group: adm
+        recurse: yes
